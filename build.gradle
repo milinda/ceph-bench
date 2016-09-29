@@ -1,0 +1,29 @@
+buildscript {
+  repositories {
+    mavenCentral()
+  }
+  dependencies {
+    classpath "io.spring.gradle:dependency-management-plugin:0.5.4.RELEASE"
+  }
+}
+
+apply plugin: "io.spring.dependency-management"
+apply plugin: 'java'
+
+dependencyManagement {
+  imports {
+    mavenBom 'com.amazonaws:aws-java-sdk-bom:1.10.47'
+  }
+}
+
+repositories {
+  jcenter()
+}
+
+dependencies {
+  compile 'ch.qos.logback:logback-classic:1.0.13'
+  compile 'com.amazonaws:aws-java-sdk-s3'
+  compile 'org.hdrhistogram:HdrHistogram:2.1.9'
+  compile group: 'com.beust', name: 'jcommander', version: '1.48'
+  testCompile 'junit:junit:4.12'
+}
