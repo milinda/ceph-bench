@@ -22,24 +22,22 @@ import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.beust.jcommander.JCommander;
+import com.beust.jcommander.Parameter;
 
+import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
-public class ReadThroughputBench extends AbstractBenchmark {
+public class WriteThroughputBench extends AbstractBenchmark {
 
-  private final Path parentDir = Files.createTempDirectory("readthroughput");
+  @Parameter(names = {"-vd", "--volume-dir"}, description = "Path to directory containing volumes", required = true)
+  private String volumesDirectory;
 
-  public ReadThroughputBench() throws IOException {
-  }
-
-  private void downloadVolumes(List<String> volumes) {
+  private void writeVolumes(List<String> volumes) {
     for (String volume : volumes) {
       pool.submit(() -> {
         AWSCredentials credentials = new BasicAWSCredentials(accessKey, secretKey);
@@ -50,29 +48,31 @@ public class ReadThroughputBench extends AbstractBenchmark {
         AmazonS3 conn = new AmazonS3Client(credentials, clientConfig);
         conn.setEndpoint(host);
         // When saved to a file, we assume that node running the benchmark has better write throughput than read throughput of Ceph
-        conn.getObject(new GetObjectRequest(VOL_BUCKET, volume), Paths.get(parentDir.toAbsolutePath().toString(), volume).toFile());
+        conn.putObject(new PutObjectRequest(VOL_BUCKET, volume, Paths.get(volumesDirectory, String.format("%s.zip", volume)).toFile()));
 
         doneSignal.countDown();
       });
     }
   }
 
-  public void run() throws InterruptedException, IOException {
-    if (!isBucketExists(VOL_BUCKET)) {
-      throw new RuntimeException("Cannot find bucket " + VOL_BUCKET + " containing volumes.");
-    }
-
+  public void run() throws InterruptedException {
     for (int i = 0; i < iterations; i++) {
+      if (isBucketExists(VOL_BUCKET_WRITE)) {
+        deleteBucket(VOL_BUCKET_WRITE);
+      }
+
+      createBucket(VOL_BUCKET_WRITE);
+
       long start = System.currentTimeMillis();
 
-      downloadVolumes(getRandomVolumes(numberOfVolumes));
+      List<String> volumes = getRandomVolumes(numberOfVolumes);
+      writeVolumes(volumes);
 
-      // Wait for downloads to finish
       doneSignal.await();
 
       long stop = System.currentTimeMillis();
 
-      long size = directorySize(parentDir.toFile());
+      long size = sizeOfVolumes(volumes, new File(volumesDirectory));
 
       throughput.recordValue(size / (stop - start));
 
@@ -81,16 +81,16 @@ public class ReadThroughputBench extends AbstractBenchmark {
     }
   }
 
-  public static void main(String[] args) throws InterruptedException, IOException {
-    ReadThroughputBench readThroughputBench = new ReadThroughputBench();
-    new JCommander(readThroughputBench, args);
-    readThroughputBench.init();
-    readThroughputBench.run();
-    readThroughputBench.printResults();
+  public static void main(String[] args) throws IOException, InterruptedException {
+    WriteThroughputBench writeThroughputBench = new WriteThroughputBench();
+    new JCommander(writeThroughputBench, args);
+    writeThroughputBench.init();
+    writeThroughputBench.run();
+    writeThroughputBench.printResults();
   }
 
   @Override
   String benchmark() {
-    return "read-throughput";
+    return "write-throughput";
   }
 }
