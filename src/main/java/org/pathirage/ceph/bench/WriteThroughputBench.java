@@ -16,12 +16,6 @@
 
 package org.pathirage.ceph.bench;
 
-import com.amazonaws.ClientConfiguration;
-import com.amazonaws.Protocol;
-import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
@@ -40,15 +34,8 @@ public class WriteThroughputBench extends AbstractBenchmark {
   private void writeVolumes(List<String> volumes) {
     for (String volume : volumes) {
       pool.submit(() -> {
-        AWSCredentials credentials = new BasicAWSCredentials(accessKey, secretKey);
-
-        ClientConfiguration clientConfig = new ClientConfiguration();
-        clientConfig.setProtocol(Protocol.HTTP);
-
-        AmazonS3 conn = new AmazonS3Client(credentials, clientConfig);
-        conn.setEndpoint(host);
         // When saved to a file, we assume that node running the benchmark has better write throughput than read throughput of Ceph
-        conn.putObject(new PutObjectRequest(VOL_BUCKET, volume, Paths.get(volumesDirectory, String.format("%s.zip", volume)).toFile()));
+        getS3Connection().putObject(new PutObjectRequest(VOL_BUCKET, volume, Paths.get(volumesDirectory, String.format("%s.zip", volume)).toFile()));
 
         doneSignal.countDown();
       });

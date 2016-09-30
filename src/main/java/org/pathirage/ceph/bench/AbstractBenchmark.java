@@ -38,7 +38,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
-public abstract class AbstractBenchmark {
+public abstract class AbstractBenchmark extends S3Client {
   static final String VOL_BUCKET = "volumes";
   static final String VOL_BUCKET_WRITE = "volumesw";
   static final double[] LOGARITHMIC_PERCENTILES = {
@@ -144,15 +144,6 @@ public abstract class AbstractBenchmark {
   @Parameter(names = {"-vl", "--volume-list"}, description = "Path to volume list file", required = true)
   String volumeList;
 
-  @Parameter(names = {"-h", "--host"}, description = "Ceph Object Gateway host", required = true)
-  String host;
-
-  @Parameter(names = {"-k", "--access-key"}, required = true, description = "Access Key")
-  String accessKey;
-
-  @Parameter(names = {"-s", "--secret-key"}, required = true, description = "Access Key Secret")
-  String secretKey;
-
   @Parameter(names = {"-i", "--iterations"}, description = "Number of times the test should be performed")
   Integer iterations = 5;
 
@@ -208,30 +199,6 @@ public abstract class AbstractBenchmark {
     return length;
   }
 
-  AmazonS3 getS3Connection() {
-    AWSCredentials credentials = new BasicAWSCredentials(accessKey, secretKey);
-
-    ClientConfiguration clientConfig = new ClientConfiguration();
-    clientConfig.setProtocol(Protocol.HTTP);
-
-    AmazonS3 conn = new AmazonS3Client(credentials, clientConfig);
-    conn.setEndpoint(host);
-
-    return conn;
-  }
-
-  boolean isBucketExists(String bucket) {
-    return getS3Connection().doesBucketExist(bucket);
-  }
-
-  void createBucket(String bucket) {
-    getS3Connection().createBucket(bucket);
-  }
-
-  void deleteBucket(String bucket) {
-    getS3Connection().deleteBucket(bucket);
-  }
-
   abstract String benchmark();
 
   public void printResults() {
@@ -241,7 +208,7 @@ public abstract class AbstractBenchmark {
     System.out.println("Iterations:\t" + iterations);
     System.out.println("Parallelism:\t" + parallelism);
     System.out.println("Percentile \t Value");
-    for(double p: LOGARITHMIC_PERCENTILES) {
+    for (double p : LOGARITHMIC_PERCENTILES) {
       System.out.println(String.format("%f \t %f", p, throughput.getValueAtPercentile(p)));
     }
   }
